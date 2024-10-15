@@ -2,8 +2,13 @@ package com.qbc.common.pojo;
 
 import com.qbc.util.CopyUtil;
 import lombok.Data;
+import org.hibernate.query.internal.NativeQueryImpl;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.support.PageableExecutionUtils;
 
+import javax.persistence.EntityManager;
+import javax.persistence.Query;
 import java.util.List;
 
 /**
@@ -41,10 +46,26 @@ public class PageInfo<M> {
             pageInfo.setSord(split[1].trim().toLowerCase());//ソート順序
         }
         pageInfo.setRows(CopyUtil.copyList(page.getContent(), entityModelClass));//分页结果
-        pageInfo.setRecords(records);//总记录数
-        pageInfo.setTotal(total);//总页数
+        pageInfo.setRecords(records);// 総記録数
+        pageInfo.setTotal(total);//総ページ数
 
         return pageInfo;
     }
 
+    /**
+     * 获取JPA的分页对象
+     */
+    public static Page getJpaPage(Query query, PageRequest pageRequest, EntityManager em) {
+        query.setFirstResult((int)pageRequest.getOffset());
+        query.setMaxResults(pageRequest.getPageSize());
+        //获取分页结果
+        return PageableExecutionUtils.getPage(query.getResultList(), pageRequest, () -> {
+            //设置countQuerySQL语句
+            Query countQuery = em.createNativeQuery("select count(*) from (" + ((NativeQueryImpl) query).getQueryString() + ") count_table");
+            //设置countQuerySQL参数
+            query.getParameters().forEach(parameter -> countQuery.setParameter(parameter.getName(), query.getParameterValue(parameter.getName())));
+            // 返回一个总数
+            return Long.valueOf(countQuery.getResultList().get(0).toString());
+        });
+    }
 }
