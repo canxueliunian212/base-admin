@@ -7,6 +7,8 @@ import com.qbc.common.repository.CommonRepository;
 import com.qbc.util.CopyUtil;
 import com.qbc.util.ErrorUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.annotations.NotFound;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Example;
 import org.springframework.util.StringUtils;
@@ -16,6 +18,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -104,19 +107,45 @@ public class CommonServiceImpl<V, E, T> implements CommonService<V, E, T> {
                         isInsert = true;
                     }
                 }
+                // 如果前端不传这两个值，后台来维护创建时间，更新时间
+                if (isInsert && "createTime".equals(fieldName) && StringUtils.isEmpty(fieldValue)) {
+                    //先赋值给fieldValue，以免后续进行copy对象判断属性是否为忽略属性是出错
+                    fieldValue = new Date();
+
+                    //set方法，第一个参数是对象
+                    field.set(entity, fieldValue);
+                }
+                if ("updateTime".equals(fieldName) && StringUtils.isEmpty(fieldValue)) {
+                    //先赋值给fieldValue，以免后续进行copy对象判断属性是否为忽略属性是出错
+                    fieldValue = new Date();
+
+                    //set方法，第一个参数是对象
+                    field.set(entity, fieldValue);
+                }
+                //找出值为空的属性，值为空则为忽略属性，或者被NotFound标注，我们复制的时候不进行赋值
+                if(null == fieldValue || field.isAnnotationPresent(NotFound.class)){
+                    ignoreProperties.add(fieldName);
+                }
+
+                /*
+                org.springframework.beans BeanUtils.copyProperties(A,B); 是A中的值付给B
+                org.apache.commons.beanutils; BeanUtils.copyProperties(A,B);是B中的值付给A
+                把entity的值赋给entityFull，第三个参数是忽略属性，表示不进行赋值
+                */
+                BeanUtils.copyProperties(entity, entityFull, ignoreProperties.toArray(new String[0]));
 
             }
         } catch (IllegalAccessException e) {
             //输出到日志文件中
             log.error(ErrorUtil.errorInfoToString(e));
         }
-
-
-        return null;
+        E e = commonRepository.save(entityFull);
+        return Result.of(CopyUtil.copy(e, entityVoClass));
     }
 
     @Override
     public Result<T> delete(T id) {
-        return null;
+        commonRepository.deleteById(id);
+        return Result.of(id);
     }
 }
