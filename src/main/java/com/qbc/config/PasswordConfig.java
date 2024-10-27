@@ -1,7 +1,11 @@
 package com.qbc.config;
 
+import com.qbc.util.MD5Util;
 import org.eclipse.jetty.util.security.Password;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+import java.awt.*;
 
 /**
  * @ClassNme PasswordConfig
@@ -10,15 +14,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
  * @Date 2024/10/22 13:55
  * @Version 1.0
  **/
+@Component
 public class PasswordConfig  implements PasswordEncoder {
     @Override
     public String encode(CharSequence rawPassword) {
-
-        return "";
+        return MD5Util.getMd5(rawPassword.toString());
     }
 
     @Override
     public boolean matches(CharSequence rawPassword, String encodedPassword) {
-        return false;
+        return encodedPassword.contentEquals(this.encode(rawPassword));
     }
 }
